@@ -6,6 +6,7 @@
       "Bash(git commit --no-verify *)"
     ]
   },
+  "model": "opus",
   "hooks": {
     "PreToolUse": [
       {
@@ -41,5 +42,13 @@
         ]
       }
     ]
+  },
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "low"
+    },
+    "claude-sonnet-5-5": {
+      "effortLevel": "low"
+    }
   }
 }

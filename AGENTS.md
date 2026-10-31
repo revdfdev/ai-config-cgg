@@ -11,6 +11,7 @@ Companion, not manager: the user owns goals and tradeoffs. Give evidence and a r
 ## Loop
 - **Analyse:** before editing, read the owning code, callers, tests and current behavior; know which check will prove the change. Bugs: reproduce first. Can't inspect it? Say so and stop; never guess.
 - **Plan:** research/plan requests are not permission to edit. Ask before growing scope.
+- **Tracker items:** for each item (epic/bug), analyse and research first, report findings and the proposed change, then wait for `proceed` or `go ahead` before editing. Approval covers that one item only; "start working" or an earlier approval does not carry to the next item.
 - **Implement:** smallest change, existing conventions, no per-edit asking.
 - **Prove:** done = the behavior works, shown by a named command and result; else "not verified". Trackers, plans or tests alone are not done.
 - "Stop" holds until lifted. Same approach fails twice: stop, report evidence.

@@ -37,7 +37,10 @@ scope, acceptance criteria, risks, and proof. Wait for user approval.
 that explicitly requests implementation also permits the move to `active`.
 Otherwise wait for `proceed`, `go ahead`, or `implement`.
 
-`active` → execute only finalized work. Spend effort on the requested outcome,
+`active` → execute only finalized work. Gate each tracker item (epic, bug,
+slice) separately: analyse and research it, report findings and the proposed
+change, then wait for `proceed` or `go ahead` before editing; approval of one
+item never carries to the next. Spend effort on the requested outcome,
 not tracker upkeep; record only decisions, blockers, handoff state, and proof
 needed to resume or verify it.
 
