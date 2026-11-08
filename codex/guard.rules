@@ -1,4 +1,6 @@
 # Codex command rules: "forbidden" refuses, "prompt" asks the user first.
+# shortcut: prefix rules cannot skip flags, so `kubectl -n x delete` and DB writes inside mongosh/psql
+# are not caught here (guard-bash.py catches them for Claude and Antigravity); upgrade when Codex gets a PreToolUse hook.
 prefix_rule(pattern = ["git", "push"], decision = "prompt", justification = "Push needs your approval now.")
 prefix_rule(pattern = ["git", "tag"], decision = "prompt", justification = "Tagging needs your approval now.")
 prefix_rule(pattern = ["git", "reset", "--hard"], decision = "prompt", justification = "Discards uncommitted work.")
@@ -8,9 +10,14 @@ prefix_rule(pattern = ["git", "clean"], decision = "prompt", justification = "De
 prefix_rule(pattern = ["git", "stash"], decision = "prompt", justification = "Stash hides others' work.")
 prefix_rule(pattern = ["git", "branch", "-D"], decision = "prompt", justification = "Force-deletes a branch.")
 prefix_rule(pattern = ["git", "commit", "--no-verify"], decision = "forbidden", justification = "Do not skip git hooks.")
-prefix_rule(pattern = ["rm", ["-rf", "-fr", "-Rf", "-r", "-R"]], decision = "prompt", justification = "Recursive delete.")
-prefix_rule(pattern = ["kubectl", ["apply", "delete", "rollout", "scale", "patch", "edit", "replace", "create"]], decision = "prompt", justification = "Cluster change needs approval.")
-prefix_rule(pattern = ["helm", ["install", "upgrade", "uninstall", "rollback"]], decision = "prompt", justification = "Cluster change needs approval.")
+prefix_rule(pattern = ["rm", ["-rf", "-fr", "-Rf", "-r", "-R", "--recursive"]], decision = "prompt", justification = "Recursive delete.")
+prefix_rule(pattern = ["kubectl", ["apply", "delete", "rollout", "scale", "patch", "edit", "replace", "create", "drain", "cordon", "taint", "label", "annotate", "set"]], decision = "prompt", justification = "Cluster change needs approval.")
+prefix_rule(pattern = ["helm", ["install", "upgrade", "uninstall", "rollback", "delete"]], decision = "prompt", justification = "Cluster change needs approval.")
 prefix_rule(pattern = ["docker", "push"], decision = "prompt", justification = "Publishing an image needs approval.")
 prefix_rule(pattern = ["gh", "pr", ["create", "merge"]], decision = "prompt", justification = "Publishing needs approval.")
 prefix_rule(pattern = ["gh", "release", "create"], decision = "prompt", justification = "Publishing needs approval.")
+prefix_rule(pattern = ["crictl", ["rmi", "rmp", "rm"]], decision = "prompt", justification = "Removes containers or images.")
+prefix_rule(pattern = ["k3s", "crictl", ["rmi", "rmp", "rm"]], decision = "prompt", justification = "Removes containers or images.")
+prefix_rule(pattern = ["docker", ["rm", "rmi"]], decision = "prompt", justification = "Removes containers or images.")
+prefix_rule(pattern = ["docker", ["system", "image", "volume", "container", "builder"], "prune"], decision = "prompt", justification = "Removes containers or images.")
+prefix_rule(pattern = ["terraform", ["apply", "destroy"]], decision = "prompt", justification = "Infrastructure change needs approval.")

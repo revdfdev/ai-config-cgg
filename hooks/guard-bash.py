@@ -4,6 +4,9 @@ import json
 import re
 import sys
 
+# Global flags before a subcommand: -n x, --context prod, --namespace=x, --insecure.
+FLAGS = r"(?:\s+--?[\w-]+(?:=\S+|\s+(?!-)\S+)?)*"
+
 DENY = [
     (r"--no-verify\b", "Do not skip git hooks."),
     (r"(?i)co-authored-by", "No Co-Authored-By trailers."),
@@ -17,9 +20,14 @@ ASK = [
     (r"\bgit\s+clean\s+-\w*f", "Deletes untracked files."),
     (r"\bgit\s+stash(?!\s+(list|show)\b)(\s|$)", "Stash hides others' work."),
     (r"\bgit\s+branch\s+-D\b", "Force-deletes a branch."),
-    (r"\brm\s+-\w*(rf|fr)\w*\b", "Recursive force delete."),
-    (r"\bkubectl\s+(apply|delete|rollout|scale|patch|edit|replace|create)\b", "Cluster change needs approval."),
-    (r"\bhelm\s+(install|upgrade|uninstall|rollback)\b", "Cluster change needs approval."),
+    (r"\brm\b(?=[^;&|\n]*\s(-\w*[rR]\w*|--recursive)\b)(?=[^;&|\n]*\s(-\w*f\w*|--force)\b)", "Recursive force delete."),
+    (r"\bkubectl" + FLAGS + r"\s+(apply|delete|rollout|scale|patch|edit|replace|create|drain|cordon|taint|label|annotate|set)\b", "Cluster change needs approval."),
+    (r"\bhelm" + FLAGS + r"\s+(install|upgrade|uninstall|rollback|delete)\b", "Cluster change needs approval."),
+    (r"\bmongo(sh)?\b[^\n]*\.(drop|dropDatabase|dropIndex(es)?|deleteMany|deleteOne|remove|updateMany|updateOne|replaceOne|findOneAndDelete|renameCollection)\s*\(", "Database write needs approval."),
+    (r"(?i)\b(psql|mysql|mariadb|sqlite3)\b[^\n]*\b(drop\s+(table|database|schema)|truncate\b|delete\s+from)", "Database write needs approval."),
+    (r"\bcrictl\s+(rmi|rmp|rm)\b|\bctr\b[^;&|\n]*\s(rm|remove|prune)\b", "Removes containers or images."),
+    (r"\bdocker\s+((system|image|volume|container|builder)\s+prune|rmi?)\b", "Removes containers or images."),
+    (r"\bterraform\s+(apply|destroy)\b", "Infrastructure change needs approval."),
     (r"\bdocker\s+push\b", "Publishing an image needs approval."),
     (r"\bgh\s+(pr\s+(create|merge)|release\s+create)\b", "Publishing needs approval."),
 ]

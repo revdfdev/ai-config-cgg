@@ -7,9 +7,7 @@ session; read it when a task needs more detail. If it conflicts with
 ## 1. Start with context
 
 1. Read the applicable global and repository `AGENTS.md` files.
-2. Check for an active `.atmar/trackers/*/STATE.md`; if present, load
-   `tracker-control` and follow its state boundary before any other work.
-3. Read relevant shared memory in
+2. Read relevant shared memory in
    `~/ai-config-ccg/MEMORIES/`, and relevant project memory through
    its `docs/agent-memory/INDEX.md` when present.
 4. Inspect only the working-tree state, code, configuration, callers,
@@ -31,9 +29,8 @@ task, and stop once it supports a bounded change.
 1. Identify the requested outcome and its boundary; communicate only decisions
    or risks the user needs to know.
 2. For a small, contained change, proceed within that boundary.
-3. For research-first, cross-session, multi-agent, or explicitly tracked work,
-   use `tracker-control`: research, propose, finalize the accepted boundary,
-   then activate when the user requests implementation.
+3. For a change bigger than a few lines or spanning files or services, use
+   `plan`: one short file of steps, each with its proof; wait for `proceed`.
 4. Do not broaden the work because adjacent cleanup, an unrelated defect, or
    an alternative design looks attractive. Ask if a necessary change exceeds
    the approved scope.
@@ -41,7 +38,7 @@ task, and stop once it supports a bounded change.
 Work with the user as a collaborator. Explain a material uncertainty and give
 an evidence-based recommendation, but leave goals, priorities, and tradeoffs
 to the user. Do not withhold a routine scoped implementation behind an
-unnecessary approval step, and do not use a tracker to overrule a newer
+unnecessary approval step, and do not use a plan to overrule a newer
 explicit instruction.
 
 ## 3. Implement deliberately
@@ -71,10 +68,10 @@ explicit instruction.
    retrying blindly.
 
 For implementation tasks, the outcome is the requested working feature or
-fix, not a filled tracker or finished plan. Use tests and checks to prove the
-outcome; writing a test or changing tracker state without a passing, relevant
+fix, not a finished plan. Use tests and checks to prove the
+outcome; writing a test or ticking a plan step without a passing, relevant
 result is not completion. For research-only tasks, the requested findings are
-the outcome; do not implement merely to close the tracker.
+the outcome; do not implement merely to finish a plan.
 If proof cannot run, keep the work open and report what remains unverified.
 
 ## Thread handoff
@@ -82,15 +79,14 @@ If proof cannot run, keep the work open and report what remains unverified.
 If a response is cut off, the same investigation repeats without new evidence,
 or context has become too large to track the task reliably, stop the current
 work. Tell the user to start a new thread. Give a short, copyable handoff with
-the objective, current tracker path and state if any, verified findings,
-remaining step, and exact files to read. For an active tracker, put that next
-step and evidence in its `STATE.md` first. Do not paste the transcript, reload
+the objective, plan file path if any, verified findings, remaining step, and
+exact files to read. Tick proven plan steps first. Do not paste the transcript, reload
 all earlier output, or keep resuming a cut-off response in the same thread.
 
 ## 5. Close the loop
 
 1. Re-read the request and validate the delivered behavior against its
-   acceptance criteria. Close a tracker only after that proof, never to make
+   acceptance criteria. Delete the plan file only after that proof, never to make
    the process look complete.
 2. Report the outcome first, then relevant changed files, verification, and
    anything not verified.

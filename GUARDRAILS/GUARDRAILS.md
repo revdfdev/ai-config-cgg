@@ -19,10 +19,8 @@ conflict, `AGENTS.md` wins.
 - Before any code edit, confirm the owning code path and relevant contract,
   caller, or test from the live repository. If that evidence is unavailable,
   report the limit; do not invent the implementation or claim research was done.
-- When a tracker is active, its `STATE.md`, research, and finalized proposal
-  are the controlling boundary. Do not leave it, open another active tracker,
-  or start implementation before its proposal is finalized and approved by
-  the user's implementation request.
+- When an approved plan exists, its steps are the controlling boundary. Do not
+  add steps or start implementation before the user says `proceed`.
 
 ## Communication
 
