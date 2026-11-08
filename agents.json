@@ -1,0 +1,58 @@
+{
+  "_doc": "One entry per agent. Paths are relative to the home folder. Add only parts confirmed by the agent's own docs; leave a part out instead of guessing. rules.mode: block = shared block appended to a file the user may already have; file = our own file in a rules folder.",
+  "agents": [
+    {
+      "key": "claude", "label": "Claude Code", "detect": [".claude"],
+      "rules": {"path": ".claude/CLAUDE.md", "mode": "block"},
+      "skills": ".claude/skills",
+      "hooks": {"path": ".claude/settings.json", "template": "claude/settings.json", "format": "events", "deny": true},
+      "docs": "https://code.claude.com/docs/en/settings"
+    },
+    {
+      "key": "codex", "label": "Codex", "detect": [".codex"],
+      "rules": {"path": ".codex/AGENTS.md", "mode": "block"},
+      "skills": ".codex/skills",
+      "hooks": {"path": ".codex/hooks.json", "template": "codex/hooks.json", "format": "events"},
+      "rulesfile": {"path": ".codex/rules/ai-config-ccg.rules", "source": "codex/guard.rules"},
+      "docs": "https://developers.openai.com/codex"
+    },
+    {
+      "key": "gemini", "label": "Gemini / Antigravity", "detect": [".gemini"],
+      "rules": {"path": ".gemini/GEMINI.md", "mode": "block"},
+      "skills": ".gemini/config/skills",
+      "hooks": {"path": ".gemini/config/hooks.json", "template": "gemini/hooks.json", "format": "groups"}
+    },
+    {
+      "key": "cline", "label": "Cline", "detect": [".cline", "Documents/Cline"],
+      "rules": {"path": "Documents/Cline/Rules/ai-config-ccg.md", "mode": "file"},
+      "skills": ".cline/skills",
+      "docs": "https://docs.cline.bot/features/cline-rules/overview"
+    },
+    {
+      "key": "opencode", "label": "OpenCode", "detect": [".config/opencode"],
+      "rules": {"path": ".config/opencode/AGENTS.md", "mode": "block"},
+      "skills": ".config/opencode/skills",
+      "docs": "https://opencode.ai/docs/rules/"
+    },
+    {
+      "key": "kimi", "label": "Kimi Code", "detect": [".kimi-code"],
+      "skills": ".kimi-code/skills",
+      "docs": "https://moonshotai.github.io/kimi-code/en/customization/skills.html"
+    },
+    {
+      "key": "copilot", "label": "GitHub Copilot CLI", "detect": [".copilot"],
+      "skills": ".copilot/skills",
+      "docs": "https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills"
+    },
+    {
+      "key": "cursor", "label": "Cursor", "detect": [".cursor"],
+      "skills": ".cursor/skills",
+      "docs": "https://cursor.com/docs/skills"
+    },
+    {
+      "key": "windsurf", "label": "Windsurf", "detect": [".codeium/windsurf"],
+      "rules": {"path": ".codeium/windsurf/memories/global_rules.md", "mode": "block", "max_chars": 6000},
+      "docs": "https://docs.windsurf.com/windsurf/cascade/memories"
+    }
+  ]
+}

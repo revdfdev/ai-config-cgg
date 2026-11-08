@@ -25,21 +25,22 @@ ROOT = Path(__file__).resolve().parent
 START, END = "<!-- ai-config-ccg:start -->", "<!-- ai-config-ccg:end -->"
 GROUP_PREFIX = "ai-config-ccg-"
 
-AGENTS = {
-    "claude": {"label": "Claude Code", "dir": ".claude", "rules": ".claude/CLAUDE.md",
-               "skills": ".claude/skills", "hooks": (".claude/settings.json", "claude/settings.json", "events")},
-    "codex": {"label": "Codex", "dir": ".codex", "rules": ".codex/AGENTS.md", "skills": ".codex/skills",
-              "hooks": (".codex/hooks.json", "codex/hooks.json", "events"),
-              "rulesfile": (".codex/rules/ai-config-ccg.rules", "codex/guard.rules")},
-    "gemini": {"label": "Gemini / Antigravity", "dir": ".gemini", "rules": ".gemini/GEMINI.md",
-               "skills": ".gemini/config/skills", "hooks": (".gemini/config/hooks.json", "gemini/hooks.json", "groups")},
-}
-COMPONENTS = [
-    ("rules", "Rules", "Adds the shared working rules to each agent's rules file. Your own text stays."),
-    ("skills", "Skills", "Links skills such as plan, tdd and review into each agent."),
-    ("safety", "Safety guard", "Asks you first before push, rm -rf, kubectl/helm changes, database drops."),
-    ("checks", "Proof check", "Agent can't say 'done' after edits without naming a check; short per-prompt reminder."),
-]
+AGENTS = {a["key"]: a for a in json.loads((ROOT / "agents.json").read_text(encoding="utf-8"))["agents"]}
+COMPONENTS = ["rules", "skills", "safety", "checks"]
+
+
+def parts_of(agent):
+    """The parts this agent supports, from its agents.json entry."""
+    out = []
+    if "rules" in agent:
+        out.append("rules")
+    if "skills" in agent:
+        out.append("skills")
+    if "hooks" in agent or "rulesfile" in agent:
+        out.append("safety")
+    if "hooks" in agent:
+        out.append("checks")
+    return out
 
 
 # ---------- paths, io ----------
@@ -127,100 +128,72 @@ def green(t): return Style.c("32", t)
 def yellow(t): return Style.c("33", t)
 
 
-def real_read_key():
-    if os.name == "nt":
-        import msvcrt
-        c = msvcrt.getwch()
-        if c in ("\x00", "\xe0"):
-            return {"H": "up", "P": "down"}.get(msvcrt.getwch(), "")
-        return {"\r": "enter", " ": "space", "\x03": "quit", "q": "quit", "a": "all"}.get(c, c)
-    import termios
-    import tty
-    fd = sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
+def ask(prompt):
+    """input() that treats a closed stdin (pipe, CI) as pressing Enter."""
     try:
-        tty.setraw(fd)
-        c = sys.stdin.read(1)
-        if c == "\x1b":
-            return {"[A": "up", "[B": "down"}.get(sys.stdin.read(2), "")
-        return {"\r": "enter", "\n": "enter", " ": "space", "\x03": "quit", "q": "quit",
-                "k": "up", "j": "down", "a": "all"}.get(c, c)
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        return input(prompt).strip()
+    except EOFError:
+        print()
+        return ""
 
 
-def interactive():
-    return sys.stdin.isatty() and sys.stdout.isatty()
-
-
-def checkbox(title, items, read_key=None, plain_input=None, out=None, single=False):
-    """items: (key, label, description, checked). Returns the checked keys in order."""
-    out = out or sys.stdout
-    checked = [bool(i[3]) for i in items]
-    if read_key is None and plain_input is None:
-        if interactive():
-            read_key = real_read_key
-            if os.name == "nt":
-                os.system("")  # enables ANSI escapes in the Windows console
-        else:
-            plain_input = input
-    if read_key:
-        pos, drawn = 0, 0
-        hint = "↑/↓ move · enter choose" if single else "↑/↓ move · space tick · a all · enter continue"
-        while True:
-            if drawn:
-                out.write("\x1b[%dA\x1b[J" % drawn)
-            lines = [bold(title), dim(hint)]
-            for n, (key, label, desc, _) in enumerate(items):
-                mark = ("(•)" if n == pos else "( )") if single else ("[x]" if checked[n] else "[ ]")
-                cur = ">" if n == pos else " "
-                lines.append("%s %s %s  %s" % (cur, green(mark) if checked[n] or single and n == pos else mark,
-                                               bold(label) if n == pos else label, dim(desc)))
-            out.write("\n".join(lines) + "\n")
-            out.flush()
-            drawn = len(lines)
-            k = read_key()
-            if k == "up":
-                pos = (pos - 1) % len(items)
-            elif k == "down":
-                pos = (pos + 1) % len(items)
-            elif k == "space" and not single:
-                checked[pos] = not checked[pos]
-            elif k == "all" and not single:
-                checked = [not all(checked)] * len(items)
-            elif k == "enter":
-                if single:
-                    return [items[pos][0]]
-                return [i[0] for i, c in zip(items, checked) if c]
-            elif k == "quit":
-                raise SystemExit(130)
+def yes(question, default):
+    hint = "[Y/n]" if default else "[y/N]"
     while True:
-        out.write(bold(title) + "\n")
-        for n, (key, label, desc, _) in enumerate(items, 1):
-            mark = "" if single else ("[x] " if checked[n - 1] else "[ ] ")
-            out.write("  %d. %s%s  %s\n" % (n, mark, label, dim(desc)))
-        prompt = "Pick a number: " if single else "Numbers to toggle (e.g. 1 3), Enter to continue: "
-        out.flush()
-        try:
-            answer = plain_input(prompt).strip()
-        except EOFError:  # no one to ask (piped/CI): keep the defaults
-            out.write("\n")
-            return [items[0][0]] if single else [i[0] for i, c in zip(items, checked) if c]
-        nums = [int(x) - 1 for x in answer.replace(",", " ").split() if x.isdigit() and 0 < int(x) <= len(items)]
-        if single:
-            if nums:
-                return [items[nums[0]][0]]
-            continue
+        answer = ask("%s %s " % (question, hint)).lower()
         if not answer:
-            return [i[0] for i, c in zip(items, checked) if c]
-        for n in nums:
-            checked[n] = not checked[n]
+            return default
+        if answer in ("y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+        print("  Please answer y or n.")
 
 
-def confirm(question):
-    if not interactive():
-        return False
-    return input("%s [y/N] " % question).strip().lower() in ("y", "yes")
+def pick_agents(found):
+    keys = list(AGENTS)
+    print(bold("Agents"))
+    for n, k in enumerate(keys, 1):
+        print("  %d. %-22s %s" % (n, AGENTS[k]["label"], green("(found)") if k in found else ""))
+    while True:
+        answer = ask("Which agents? (numbers, e.g. 1 3 4; Enter = the found ones): ")
+        if not answer:
+            return found
+        nums = answer.replace(",", " ").split()
+        if all(x.isdigit() and 0 < int(x) <= len(keys) for x in nums):
+            return [keys[int(x) - 1] for x in nums]
+        print("  Use numbers from the list.")
+
+
+def has_own_text(path):
+    return path.exists() and path.read_text(encoding="utf-8").strip() and START not in path.read_text(encoding="utf-8")
+
+
+def ask_parts(agent, allowed, skill_names):
+    h = home()
+    chosen = set()
+    print("\n" + bold(agent["label"]))
+    for part in parts_of(agent):
+        if part not in allowed:
+            continue
+        if part == "rules":
+            r = agent["rules"]
+            p = h / r["path"]
+            if r["mode"] == "file":
+                q, d = "Add the shared working rules as %s?" % tilde(p), True
+            elif has_own_text(p):
+                q, d = "Add the shared working rules to %s? (it already has your own rules; this adds a second block)" % tilde(p), False
+            else:
+                q, d = "Add the shared working rules to %s?" % tilde(p), True
+        elif part == "skills":
+            q, d = "Add %d skills (%s)?" % (len(skill_names), ", ".join(skill_names)), True
+        elif part == "safety":
+            q, d = "Add the safety guard? It asks you before push, rm -rf, kubectl/helm changes, database drops.", True
+        else:
+            q, d = "Add the proof check? It stops the agent saying 'done' after edits without naming a check.", True
+        if yes("  " + q, d):
+            chosen.add(part)
+    return chosen
 
 
 # ---------- plan ----------
@@ -266,28 +239,37 @@ def merge_groups(target, ours, components):
     return added
 
 
-def build_plan(agents, components, skills, clash_choice):
+def build_plan(selection, skills, clash_choice):
+    """selection: {agent_key: set of parts}."""
     plan = Plan()
     deny = render(read_json(ROOT / "claude/settings.json")).get("permissions", {}).get("deny", [])
     agents_md = (ROOT / "AGENTS.md").read_text(encoding="utf-8").rstrip("\n").replace("~/ai-config-ccg/", ROOT.as_posix() + "/")
     block = "%s\n%s\n%s\n" % (START, agents_md, END)
-    for key in agents:
+    h = home()
+    for key, components in selection.items():
         a = AGENTS[key]
-        h = home()
+        components = set(components) & set(parts_of(a))
         if "rules" in components:
-            p = h / a["rules"]
+            r = a["rules"]
+            p = h / r["path"]
             old = p.read_text(encoding="utf-8") if p.exists() else ""
-            if START in old and END in old:
+            if r["mode"] == "file":
+                new = agents_md + "\n"
+            elif START in old and END in old:
                 before, rest = old.split(START, 1)
                 new = before + block.rstrip("\n") + rest.split(END, 1)[1]
             else:
                 new = old + ("\n" if old and not old.endswith("\n") else "") + ("\n" if old else "") + block
-            if new != old:
+            if r.get("max_chars") and len(new) > r["max_chars"]:
+                plan.notes.append("skipped rules for %s: %s would exceed its %d-character limit"
+                                  % (a["label"], tilde(p), r["max_chars"]))
+            elif new != old:
                 plan.files[p] = new.encode("utf-8")
-                plan.summary.append("%s: %s shared rules block in %s" % (a["label"], "update" if START in old else "add", tilde(p)))
-        if components & {"safety", "checks"}:
-            rel, tpl, fmt = a["hooks"]
-            p = h / rel
+                verb = "write" if r["mode"] == "file" else ("update" if START in old else "add")
+                plan.summary.append("%s: %s shared rules %s %s" % (a["label"], verb, "in" if r["mode"] == "block" else "as", tilde(p)))
+        if components & {"safety", "checks"} and "hooks" in a:
+            hk = a["hooks"]
+            p = h / hk["path"]
             try:
                 cur = read_json(p) or {}
             except ValueError:
@@ -296,10 +278,10 @@ def build_plan(agents, components, skills, clash_choice):
             if cur is not None:
                 before = dump_json(cur)
                 kept = len(cur)
-                ours = render(read_json(ROOT / tpl))
-                n = merge_events(cur, ours, components) if fmt == "events" else merge_groups(cur, ours, components)
+                ours = render(read_json(ROOT / hk["template"]))
+                n = merge_events(cur, ours, components) if hk["format"] == "events" else merge_groups(cur, ours, components)
                 added_deny = []
-                if key == "claude" and "safety" in components:
+                if hk.get("deny") and "safety" in components:
                     have = cur.setdefault("permissions", {}).setdefault("deny", [])
                     added_deny = [d for d in deny if d not in have]
                     have.extend(added_deny)
@@ -311,14 +293,14 @@ def build_plan(agents, components, skills, clash_choice):
                     plan.summary.append("%s: add %d hook(s)%s to %s, keep your %d existing setting(s)"
                                         % (a["label"], n, extra, tilde(p), kept))
         if "safety" in components and "rulesfile" in a:
-            dst, src = a["rulesfile"]
-            dst = h / dst
-            data = (ROOT / src).read_bytes()
+            dst = h / a["rulesfile"]["path"]
+            data = (ROOT / a["rulesfile"]["source"]).read_bytes()
             if not dst.exists() or dst.read_bytes() != data:
                 plan.files[dst] = data
                 plan.summary.append("%s: write command rules %s" % (a["label"], tilde(dst)))
         if "skills" in components:
             sdir = h / a["skills"]
+            new_skills = []
             for name in skills:
                 src, dst = ROOT / "skills" / name, sdir / name
                 if dst.is_symlink() and Path(os.path.realpath(dst)) == src.resolve():
@@ -330,15 +312,16 @@ def build_plan(agents, components, skills, clash_choice):
                     plan.summary.append("%s: refresh skill %s" % (a["label"], name))
                     continue
                 if dst.exists() or dst.is_symlink():
-                    choice = clash_choice(a["label"], name, dst)
-                    if choice == "skip":
+                    if not clash_choice(a["label"], name, dst):
                         plan.notes.append("kept your own %s (skill '%s' not installed for %s)" % (tilde(dst), name, a["label"]))
                         continue
                     plan.links.append((src, dst, "backup"))
                     plan.summary.append("%s: replace your skill %s (backed up)" % (a["label"], name))
                     continue
                 plan.links.append((src, dst, None))
-                plan.summary.append("%s: add skill %s" % (a["label"], name))
+                new_skills.append(name)
+            if new_skills:
+                plan.summary.append("%s: add %d skill(s) to %s: %s" % (a["label"], len(new_skills), tilde(sdir), ", ".join(new_skills)))
             if sdir.is_dir():
                 for p in sdir.iterdir():
                     if p.is_symlink() and os.path.realpath(p).startswith(str(ROOT / "skills")) \
@@ -398,9 +381,9 @@ def make_dirs(d, created):
         created.append(str(m))
 
 
-def apply_plan(plan, selection):
+def apply_plan(plan, selection, skills):
     st = load_state()
-    st.update(root=ROOT.as_posix(), selection=selection)
+    st.update(root=ROOT.as_posix(), selection=selection, skills=skills)
     files, links = st.setdefault("files", {}), st.setdefault("links", {})
     created = st.setdefault("dirs", [])
     deny, backups = st.setdefault("deny_added", {}), st.setdefault("skill_backups", {})
@@ -532,14 +515,14 @@ def uninstall(dry):
 # ---------- main ----------
 
 def detect():
-    return [k for k, a in AGENTS.items() if (home() / a["dir"]).is_dir()]
+    return [k for k, a in AGENTS.items() if any((home() / d).is_dir() for d in a["detect"])]
 
 
 def parse(argv):
     ap = argparse.ArgumentParser(description="Install ai-config-ccg rules, skills and hooks.")
-    ap.add_argument("--yes", "-y", action="store_true", help="accept defaults, no questions")
+    ap.add_argument("--yes", "-y", action="store_true", help="no questions: found agents, every part they support")
     ap.add_argument("--agents", help="comma list: " + ",".join(AGENTS))
-    ap.add_argument("--only", help="comma list: " + ",".join(c[0] for c in COMPONENTS))
+    ap.add_argument("--only", help="comma list: " + ",".join(COMPONENTS))
     mode = ap.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="show what would change, change nothing")
     mode.add_argument("--check", action="store_true", help="exit 1 if anything is missing or outdated")
@@ -549,17 +532,19 @@ def parse(argv):
 
 def main(argv=None):
     args = parse(argv)
+    py = "py" if os.name == "nt" else "python3"
     if args.uninstall:
-        if not args.yes and interactive() and not confirm("Remove everything ai-config-ccg added?"):
+        if not args.yes and not yes("Remove everything ai-config-ccg added?", False):
             return 1
         return uninstall(args.dry_run)
 
+    skills = [n for n, _ in skills_available()]
     if args.check:
-        sel = load_state().get("selection")
-        if not sel:
+        st = load_state()
+        if not st.get("selection"):
             print("Not installed (no %s)." % tilde(state_path()))
             return 1
-        plan = build_plan(sel["agents"], set(sel["components"]), sel["skills"], lambda *_: "skip")
+        plan = build_plan({k: set(v) for k, v in st["selection"].items()}, st.get("skills", skills), lambda *_: False)
         if plan.empty():
             print(green("Up to date."))
             return 0
@@ -568,42 +553,32 @@ def main(argv=None):
             print("  - " + s)
         return 1
 
-    ask = not args.yes
+    allowed = {c.strip() for c in args.only.split(",")} if args.only else set(COMPONENTS)
     found = detect()
     if args.agents:
         agents = [a.strip() for a in args.agents.split(",") if a.strip() in AGENTS]
-    elif ask:
-        print(bold("ai-config-ccg installer") + dim("  (nothing is written until you confirm)\n"))
-        items = [(k, a["label"], ("found " + tilde(home() / a["dir"])) if k in found else "not found", k in found)
-                 for k, a in AGENTS.items()]
-        agents = checkbox("Which agents?", items)
-    else:
+    elif args.yes:
         agents = found
+    else:
+        print(bold("ai-config-ccg installer") + dim("  (nothing is written until you confirm)\n"))
+        agents = pick_agents(found)
     if not agents:
-        print("No agents selected or found. Use --agents claude,codex,gemini.")
+        print("No agents selected or found. Use --agents %s." % ",".join(AGENTS))
         return 1
 
-    if args.only:
-        components = {c.strip() for c in args.only.split(",")}
-    elif ask:
-        components = set(checkbox("\nWhat to install?", [(k, l, d, True) for k, l, d in COMPONENTS]))
+    if args.yes:
+        selection = {k: set(parts_of(AGENTS[k])) & allowed for k in agents}
     else:
-        components = {c[0] for c in COMPONENTS}
-
-    skills = [n for n, _ in skills_available()]
-    if "skills" in components and ask:
-        skills = checkbox("\nWhich skills?", [(n, n, d[:70], True) for n, d in skills_available()])
+        selection = {k: ask_parts(AGENTS[k], allowed, skills) for k in agents}
 
     def clash(label, name, path):
-        if not ask:
-            return "skip"
-        return checkbox("\n%s already has a skill called '%s' (%s). What to do?" % (label, name, tilde(path)),
-                        [("skip", "Keep mine", "don't install this one", True),
-                         ("replace", "Use the new one", "yours is backed up and restored on uninstall", False)],
-                        single=True)[0]
+        if args.yes:
+            return False
+        return yes("  %s already has a skill called '%s' (%s). Replace it with this one? (yours is backed up)"
+                   % (label, name, tilde(path)), False)
 
-    plan = build_plan(agents, components, skills, clash)
-    print("\n" + bold("Review"))
+    plan = build_plan(selection, skills, clash)
+    print("\n" + bold("Here's what will change"))
     for s in plan.summary:
         print("  + " + s)
     for n in plan.notes:
@@ -614,13 +589,13 @@ def main(argv=None):
     if args.dry_run:
         print("Dry run: nothing changed.")
         return 0
-    if ask and not confirm("\nApply these changes?"):
+    if not args.yes and not yes("\nGo ahead?", False):
         print("Cancelled. Nothing changed.")
         return 1
-    apply_plan(plan, {"agents": agents, "components": sorted(components), "skills": skills})
+    apply_plan(plan, {k: sorted(v) for k, v in selection.items()}, skills)
     print(green("\nDone.") + " Changed files were backed up next to themselves (*.bak-<time>).")
-    print("Check:  %s install.py --check" % ("py" if os.name == "nt" else "python3"))
-    print("Undo:   %s install.py --uninstall" % ("py" if os.name == "nt" else "python3"))
+    print("Check:  %s install.py --check" % py)
+    print("Undo:   %s install.py --uninstall" % py)
     return 0
 
 

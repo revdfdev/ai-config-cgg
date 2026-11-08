@@ -31,15 +31,11 @@ cd ai-config-ccg
 python3 install.py          # Windows: py install.py   (or install.cmd / install.ps1)
 ```
 
-The installer asks four things, using arrow keys, space to tick and enter to
-continue (or typed numbers where the terminal can't do that):
-
-1. **Which agents** — Claude Code, Codex, Gemini/Antigravity. The ones found on
-   this machine are already ticked.
-2. **What to install** — rules, skills, safety guard, proof check.
-3. **Which skills.**
-4. **What to do on a name clash** with a skill you already have: keep yours
-   (default) or use the new one (yours is backed up and put back on uninstall).
+The installer lists the agents it knows and marks the ones found on this
+machine. You type the numbers you want (Enter = the found ones), then answer a
+few yes/no questions per agent, only for the parts that agent supports. Enter
+takes the default shown in capitals; adding rules to a file that already holds
+your own rules, and replacing a skill you already have, default to **No**.
 
 Then it shows everything it will change and writes nothing until you say yes.
 
@@ -63,11 +59,25 @@ The repository can live anywhere; hooks are written with its full path and the
 Python that ran the installer. Skills are symlinked, or copied on Windows
 without symlink rights (re-run the installer after `git pull` to refresh copies).
 
-| Agent | Rules | Skills | Hooks |
-| --- | --- | --- | --- |
-| Claude Code | `~/.claude/CLAUDE.md` | `~/.claude/skills` | `~/.claude/settings.json` |
-| Codex | `~/.codex/AGENTS.md` | `~/.codex/skills` | `~/.codex/hooks.json`, `~/.codex/rules/ai-config-ccg.rules` |
-| Gemini/Antigravity | `~/.gemini/GEMINI.md` | `~/.gemini/config/skills` | `~/.gemini/config/hooks.json` |
+Agents and what the installer adds for each (from `agents.json`). Only parts
+confirmed by the agent's own docs are included; a blank means not offered yet.
+"Tested" says what was checked beyond the installer tests; "no" means the
+files land in the documented place but nobody has confirmed the agent loads them.
+
+| Agent | Rules | Skills | Hooks | Tested |
+| --- | --- | --- | --- | --- |
+| Claude Code | `~/.claude/CLAUDE.md` (block) | `~/.claude/skills` | `~/.claude/settings.json` | hook commands run; not tried inside Claude |
+| Codex | `~/.codex/AGENTS.md` (block) | `~/.codex/skills` | `~/.codex/hooks.json`, `~/.codex/rules/ai-config-ccg.rules` | command rules (`codex execpolicy check`) |
+| Gemini/Antigravity | `~/.gemini/GEMINI.md` (block) | `~/.gemini/config/skills` | `~/.gemini/config/hooks.json` | no |
+| Cline | `~/Documents/Cline/Rules/ai-config-ccg.md` | `~/.cline/skills` | | no |
+| OpenCode | `~/.config/opencode/AGENTS.md` (block) | `~/.config/opencode/skills` | | no |
+| Kimi Code | | `~/.kimi-code/skills` | | no |
+| GitHub Copilot CLI | | `~/.copilot/skills` | | no |
+| Cursor | | `~/.cursor/skills` | | no |
+| Windsurf | `~/.codeium/windsurf/memories/global_rules.md` (block, skipped if over its 6,000-character limit) | | | no |
+
+To add or fix an agent, edit its entry in `agents.json` and link the doc page
+that confirms the path in `docs`. No code change is needed.
 
 `AGENTS.md` is the single global rule set (under 1k tokens) and `skills/` the
 single source of skills; `WORKFLOW/` and `GUARDRAILS/` are the long form, read

@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 INSTALL = ROOT / "install.py"
+START = "<!-- ai-config-ccg:start -->"
 sys.path.insert(0, str(ROOT))
 
 USER_SETTINGS = {
@@ -27,11 +28,12 @@ class Base(unittest.TestCase):
         for d in (".claude", ".codex", ".gemini"):
             (self.home / d).mkdir()
 
-    def run_install(self, *args, env=None, ok=True):
+    def run_install(self, *args, env=None, ok=True, answers=None):
         e = dict(os.environ, AI_CONFIG_CCG_HOME=str(self.home), NO_COLOR="1")
         e.update(env or {})
+        kw = {"input": answers} if answers is not None else {"stdin": subprocess.DEVNULL}
         p = subprocess.run([sys.executable, str(INSTALL), *args], env=e,
-                           capture_output=True, text=True, stdin=subprocess.DEVNULL)
+                           capture_output=True, text=True, **kw)
         if ok:
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         return p
@@ -177,20 +179,62 @@ class NoTerminal(Base):
         self.assertTrue((self.home / ".claude").is_dir())
 
 
-class Menu(unittest.TestCase):
-    def test_keys_toggle_and_confirm(self):
-        import install
-        items = [("a", "A", "", True), ("b", "B", "", False), ("c", "C", "", True)]
-        keys = iter(["down", "space", "down", "space", "enter"])
-        got = install.checkbox("pick", items, read_key=lambda: next(keys), out=io.StringIO())
-        self.assertEqual(got, ["a", "b"])
+class Questions(Base):
+    def test_pick_agents_by_number_then_yes_no_per_part(self):
+        # 1 = Claude, 4 = Cline. Claude: rules y, skills y, safety n, checks y. Cline: rules y, skills n. Confirm y.
+        out = self.run_install(answers="1 4\ny\ny\nn\ny\ny\nn\ny\n").stdout
+        self.assertIn("Cline", out)
+        s = self.settings()
+        cmds = [h["command"] for ev in s["hooks"].values() for g in ev for h in g["hooks"]]
+        self.assertTrue(any("proof-gate.py" in c for c in cmds))
+        self.assertFalse(any("guard-bash.py" in c for c in cmds))
+        self.assertNotIn("permissions", s)
+        self.assertIn(START, (self.home / ".claude/CLAUDE.md").read_text())
+        cline_rules = self.home / "Documents/Cline/Rules/ai-config-ccg.md"
+        self.assertIn("# Global Rules", cline_rules.read_text())
+        self.assertFalse((self.home / ".cline/skills").exists())
+        self.assertFalse((self.home / ".gemini/GEMINI.md").exists())
+        self.run_install("--uninstall", "--yes")
+        self.assertFalse(cline_rules.exists())
 
-    def test_plain_numbers(self):
-        import install
-        items = [("a", "A", "", True), ("b", "B", "", False), ("c", "C", "", True)]
-        answers = iter(["2 3", ""])
-        got = install.checkbox("pick", items, plain_input=lambda _p: next(answers), out=io.StringIO())
-        self.assertEqual(got, ["a", "b"])
+    def test_enter_takes_defaults_and_final_no_writes_nothing(self):
+        before = self.snapshot()
+        out = self.run_install(answers="\n" * 30, ok=False).stdout
+        self.assertIn("Go ahead?", out)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_rules_default_no_when_file_has_own_text(self):
+        self.write(".claude/CLAUDE.md", "my rules\n")
+        # Claude only; rules Enter (default No), skills/safety/checks Enter (Yes), confirm y
+        self.run_install(answers="1\n\n\n\n\ny\n")
+        self.assertEqual((self.home / ".claude/CLAUDE.md").read_text(), "my rules\n")
+        self.assertTrue((self.home / ".claude/skills/plan").exists())
+
+
+class MoreAgents(Base):
+    def test_kimi_gets_skills_only(self):
+        self.run_install("--yes", "--agents", "kimi")
+        self.assertTrue((self.home / ".kimi-code/skills/plan/SKILL.md").exists())
+        self.assertFalse((self.home / ".claude/skills").exists())
+
+    def test_opencode_rules_and_skills(self):
+        self.run_install("--yes", "--agents", "opencode")
+        self.assertIn(START, (self.home / ".config/opencode/AGENTS.md").read_text())
+        self.assertTrue((self.home / ".config/opencode/skills/plan").exists())
+
+    def test_windsurf_skips_rules_over_char_limit(self):
+        big = "x" * 5000 + "\n"
+        p = self.write(".codeium/windsurf/memories/global_rules.md", big)
+        out = self.run_install("--yes", "--agents", "windsurf").stdout
+        self.assertEqual(p.read_text(), big)
+        self.assertIn("6000", out)
+
+    def test_found_agents_only_under_yes(self):
+        (self.home / ".cursor").mkdir()
+        self.run_install("--yes")
+        self.assertTrue((self.home / ".cursor/skills/plan").exists())
+        self.assertFalse((self.home / ".copilot").exists())
+        self.assertFalse((self.home / ".kimi-code").exists())
 
 
 if __name__ == "__main__":
