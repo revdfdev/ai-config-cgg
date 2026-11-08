@@ -21,40 +21,60 @@ when done. Each project owns its facts in `AGENTS.md` and
 history is not the source of truth. A tidy plan or handoff is not a completed
 feature; the requested behavior must work and pass its acceptance checks.
 
-## Start from a clean setup
+## Install
 
-1. Put this repository at exactly `~/ai-config-ccg`. The hooks call scripts
-   there, so `install.sh` refuses to run from any other location.
-2. Read `AGENTS.md`; adjust project-specific assumptions for your
-   work. Keep each project's durable facts in that project's own `AGENTS.md`.
-3. Inspect the existing rule and skill paths shown below. Use a fresh agent
-   profile or manually resolve conflicts first; the script will not merge
-   existing configurations or delete unmanaged skills.
-4. Run `./install.sh --dry-run` to see every link it would create, then
-   `./install.sh`, then `./install.sh --check`. Use
-   `./scripts/validate-skills.sh` to check the skill structure.
-5. In a project, ask an agent to follow its repository `AGENTS.md`. Start a new thread for a new task; for planned work, carry
-   the plan file path into the new thread.
+Needs Python 3.8+ (nothing else) and works on Linux, macOS and Windows.
 
-`AGENTS.md` is the single global rule set and `skills/` is the single source
-of reusable skills. It is the only rule file loaded every session and is kept
-under 1k tokens; `WORKFLOW/` and `GUARDRAILS/` hold the same rules in long form
-and are read only when needed. Agent-specific paths expose symlinks to these files:
+```sh
+git clone https://github.com/revdfdev/ai-config-cgg ai-config-ccg
+cd ai-config-ccg
+python3 install.py          # Windows: py install.py   (or install.cmd / install.ps1)
+```
 
-| Agent | Rules | Skills |
-| --- | --- | --- |
-| Codex | `~/.codex/AGENTS.md` | `~/.codex/skills` |
-| Claude Code | `~/.claude/CLAUDE.md` | `~/.claude/skills` |
-| Gemini/Antigravity | `~/.gemini/GEMINI.md` | `~/.gemini/config/skills` |
+The installer asks four things, using arrow keys, space to tick and enter to
+continue (or typed numbers where the terminal can't do that):
 
-`./install.sh` (a wrapper for `scripts/sync-agents.sh`) creates or refreshes
-the three agents' rule and skill links. `--dry-run` lists planned changes
-without making them, `--check` verifies the links, and `--uninstall` removes
-only links that point into this repository; your own files and skills stay.
-The script preserves conflicting user files, removes stale links into this
-repository, flags unmanaged skills without deleting them, and leaves Codex's
-runtime-managed `.system` and Claude's `synced` skills alone. It does not
-copy rules into projects.
+1. **Which agents** — Claude Code, Codex, Gemini/Antigravity. The ones found on
+   this machine are already ticked.
+2. **What to install** — rules, skills, safety guard, proof check.
+3. **Which skills.**
+4. **What to do on a name clash** with a skill you already have: keep yours
+   (default) or use the new one (yours is backed up and put back on uninstall).
+
+Then it shows everything it will change and writes nothing until you say yes.
+
+**It adds, it never replaces.** Your `settings.json` / `hooks.json` keep every
+setting; only the missing hooks and deny rules are added. `CLAUDE.md`,
+`AGENTS.md` and `GEMINI.md` keep your text; the shared rules go in one marked
+block (`<!-- ai-config-ccg:start -->` … `end`). Every file it changes is backed
+up next to itself as `*.bak-<time>`. What it added is recorded in
+`~/.ai-config-ccg/state.json`.
+
+| Command | Does |
+| --- | --- |
+| `python3 install.py` | interactive install |
+| `python3 install.py --yes` | no questions: found agents, everything, keep your clashing skills |
+| `python3 install.py --agents claude --only skills,safety` | pick from the command line |
+| `python3 install.py --dry-run` | show the changes, change nothing |
+| `python3 install.py --check` | exit 1 if anything is missing or outdated (e.g. after `git pull`) |
+| `python3 install.py --uninstall` | remove only what it added; untouched files come back byte-for-byte, files you edited since keep your edits |
+
+The repository can live anywhere; hooks are written with its full path and the
+Python that ran the installer. Skills are symlinked, or copied on Windows
+without symlink rights (re-run the installer after `git pull` to refresh copies).
+
+| Agent | Rules | Skills | Hooks |
+| --- | --- | --- | --- |
+| Claude Code | `~/.claude/CLAUDE.md` | `~/.claude/skills` | `~/.claude/settings.json` |
+| Codex | `~/.codex/AGENTS.md` | `~/.codex/skills` | `~/.codex/hooks.json`, `~/.codex/rules/ai-config-ccg.rules` |
+| Gemini/Antigravity | `~/.gemini/GEMINI.md` | `~/.gemini/config/skills` | `~/.gemini/config/hooks.json` |
+
+`AGENTS.md` is the single global rule set (under 1k tokens) and `skills/` the
+single source of skills; `WORKFLOW/` and `GUARDRAILS/` are the long form, read
+only when needed. In a project, keep its own facts in its `AGENTS.md`.
+
+Tests: `python3 -m unittest discover -s tests`, `bash scripts/test-hooks.sh`,
+`bash scripts/validate-skills.sh`; CI runs them on Linux, macOS and Windows.
 
 ## Choose the workflow for the task
 
@@ -90,17 +110,19 @@ packages, but this setup does not build, publish, or install a package.
 
 ## Enforcement (Claude Code)
 
-`install.sh` also links `~/.claude/settings.json` to `claude/settings.json`,
-which adds three hooks from `hooks/`:
+The **Safety guard** and **Proof check** choices add these hooks from `hooks/`
+to `~/.claude/settings.json` (merged, see Install):
 
 These are guardrails, not a sandbox: they match command text, so a script or
 program that performs the same action internally is not seen. Keep real limits
 in OS permissions, scoped credentials, and deployment authorization.
 
 - `guard-bash.py` denies `--no-verify` and `Co-Authored-By`, and forces an
-  approval prompt for push, tag, destructive git, `rm -rf`, cluster changes,
-  image pushes, and PR/release creation.
-- `prompt-reminder.sh` adds a one-line scope/proof reminder to each prompt.
+  approval prompt for push, tag, destructive git, recursive force delete (any
+  flag spelling), `kubectl`/`helm` changes even after flags like `-n x`,
+  Mongo/SQL writes and drops, image removal, `terraform apply/destroy`, image
+  pushes, and PR/release creation.
+- `prompt-reminder.py` adds a one-line scope/proof reminder to each prompt.
 - `proof-gate.py` is an evidence-reporting gate: it stops a turn that edited
   files from ending until a command ran after the last edit and a result is
   reported, or "not verified" is stated. It does not judge whether the command
@@ -108,14 +130,15 @@ in OS permissions, scoped credentials, and deployment authorization.
 
 Run `scripts/test-hooks.sh` after changing them.
 
-For Codex, `install.sh` links `~/.codex/rules/guard.rules` to
+For Codex, the installer writes `~/.codex/rules/ai-config-ccg.rules` from
 `codex/guard.rules`: the same commands are forbidden or need approval
 (`scripts/test-codex-rules.sh` checks them with `codex execpolicy check`).
 Prefix rules cannot make exceptions, so `git stash list` and `git tag -l` also
-prompt. `~/.codex/hooks.json` links to `codex/hooks.json` (reminder and proof
-gate).
+prompt, and flags before the subcommand (`kubectl -n x delete`) are not
+caught. `~/.codex/hooks.json` gets the reminder and proof gate.
 
-For Antigravity, `~/.gemini/config/hooks.json` links to `gemini/hooks.json`:
+For Antigravity, `~/.gemini/config/hooks.json` gets the groups from
+`gemini/hooks.json`:
 the same guard on `run_command` (risky commands use `force_ask`), the reminder
 as a `PreInvocation` ephemeral message, and the proof gate on `Stop`.
 `proof-gate.py` reads Claude, Codex, and Antigravity transcripts.
