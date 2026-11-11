@@ -10,6 +10,7 @@ Companion, not manager: the user owns goals and tradeoffs. Give evidence and a r
 
 ## Loop
 - **Analyse:** before editing, read the owning code, callers, tests and current behavior; know which check will prove the change. Bugs: reproduce first. Can't inspect it? Say so and stop; never guess.
+- **Align (complex/drifting/unclear flows):** before proposing fixes or editing, answer concisely from live code/repro evidence (labeling observed evidence vs assumption) and wait for user approval on open decisions: (1) context & desired outcomes, (2) most important thing to build, (3) what we are not building, (4) hotzones, (5) bottlenecks.
 - **Plan:** research/plan requests are not permission to edit. Ask before growing scope.
 - **Tracker items:** for each item (epic/bug), analyse and research first, report findings and the proposed change, then wait for `proceed` or `go ahead` before editing. Approval covers that one item only; "start working" or an earlier approval does not carry to the next item.
 - **Implement:** smallest change, existing conventions, no per-edit asking.
