@@ -4,19 +4,19 @@
       {
         "matcher": "run_command",
         "hooks": [
-          {"type": "command", "command": "python3 -I ~/ai-config-ccg/hooks/guard-bash.py", "timeout": 10}
+          {"type": "command", "command": "@PYTHON@ -I \"@ROOT@/hooks/guard-bash.py\"", "timeout": 10}
         ]
       }
     ]
   },
   "ai-config-ccg-reminder": {
     "PreInvocation": [
-      {"type": "command", "command": "bash ~/ai-config-ccg/hooks/prompt-reminder.sh --antigravity", "timeout": 5}
+      {"type": "command", "command": "@PYTHON@ -I \"@ROOT@/hooks/prompt-reminder.py\" --antigravity", "timeout": 5}
     ]
   },
   "ai-config-ccg-proof-gate": {
     "Stop": [
-      {"type": "command", "command": "python3 -I ~/ai-config-ccg/hooks/proof-gate.py", "timeout": 15}
+      {"type": "command", "command": "@PYTHON@ -I \"@ROOT@/hooks/proof-gate.py\"", "timeout": 15}
     ]
   }
 }

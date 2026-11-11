@@ -3,7 +3,7 @@ set -euo pipefail
 
 root_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 skill_dir="$root_dir/skills"
-required=(tracker-control memory pattern tdd simplify review bug-triage e2e e2e-analysis)
+required=(plan memory pattern tdd simplify review bug-triage e2e e2e-analysis)
 
 for name in "${required[@]}"; do
   file="$skill_dir/$name/SKILL.md"
@@ -13,11 +13,10 @@ for name in "${required[@]}"; do
   grep -q '^description:' "$file" || { echo "missing description: $file" >&2; exit 1; }
 done
 
-for file in templates/tracker/STATE.md templates/tracker/research.md templates/tracker/proposal.md templates/playwright/playwright.config.ts; do
+for file in templates/playwright/playwright.config.ts; do
   [[ -f "$root_dir/$file" ]] || { echo "missing template: $file" >&2; exit 1; }
 done
 
-grep -Fqx 'State: research' "$root_dir/templates/tracker/STATE.md"
 grep -q "name: 'smoke'" "$root_dir/templates/playwright/playwright.config.ts"
 grep -q "name: 'regression'" "$root_dir/templates/playwright/playwright.config.ts"
 echo 'skills and templates: PASS'

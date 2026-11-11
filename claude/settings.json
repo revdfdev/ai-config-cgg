@@ -6,7 +6,6 @@
       "Bash(git commit --no-verify *)"
     ]
   },
-  "model": "opus",
   "hooks": {
     "PreToolUse": [
       {
@@ -14,7 +13,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -I \"$HOME/ai-config-ccg/hooks/guard-bash.py\"",
+            "command": "@PYTHON@ -I \"@ROOT@/hooks/guard-bash.py\"",
             "timeout": 10
           }
         ]
@@ -25,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$HOME/ai-config-ccg/hooks/prompt-reminder.sh\"",
+            "command": "@PYTHON@ -I \"@ROOT@/hooks/prompt-reminder.py\"",
             "timeout": 5
           }
         ]
@@ -36,19 +35,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -I \"$HOME/ai-config-ccg/hooks/proof-gate.py\"",
+            "command": "@PYTHON@ -I \"@ROOT@/hooks/proof-gate.py\"",
             "timeout": 15
           }
         ]
       }
     ]
-  },
-  "modelSettings": {
-    "claude-opus-5-5": {
-      "effortLevel": "low"
-    },
-    "claude-sonnet-5-5": {
-      "effortLevel": "low"
-    }
   }
 }

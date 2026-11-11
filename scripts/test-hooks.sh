@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+PY=${PYTHON:-python3}
 
 hooks=$(cd "$(dirname "${BASH_SOURCE[0]}")/../hooks" && pwd -P)
 work=$(mktemp -d /tmp/ai-config-ccg-hooks.XXXXXX)
@@ -7,7 +8,7 @@ trap 'gio trash -f "$work" 2>/dev/null || rm -rf "$work"' EXIT
 
 guard() {
   jq -n --arg c "$1" '{tool_name:"Bash",tool_input:{command:$c}}' |
-    python3 -I "$hooks/guard-bash.py" | jq -rs '.[0].hookSpecificOutput.permissionDecision // "allow"'
+    "$PY" -I "$hooks/guard-bash.py" | jq -rs '.[0].hookSpecificOutput.permissionDecision // "allow"'
 }
 expect_guard() {
   local got
@@ -42,6 +43,37 @@ expect_guard ask 'bash -c "git push"'
 expect_guard ask 'git  -C repo   push'
 expect_guard ask 'rm -fr dist'
 expect_guard allow 'git pushd-helper-unrelated'
+# flags before the verb
+expect_guard ask 'helm -n ingress-nginx upgrade ingress-nginx ./chart -f v.yaml'
+expect_guard ask 'kubectl -n hrms-prod rollout restart deploy'
+expect_guard ask 'kubectl --context prod delete pvc x'
+expect_guard ask 'kubectl --namespace=prod scale sts mongo --replicas=0'
+expect_guard ask 'k3s kubectl -n x delete ns ci'
+expect_guard ask 'kubectl -n x exec pod -- rm -rf /data'
+expect_guard allow 'kubectl -n hrms-prod get pods -o wide'
+expect_guard allow 'kubectl --context prod logs deploy/api --tail=50'
+expect_guard allow 'kubectl -n x describe pod p'
+expect_guard allow 'helm -n x list'
+expect_guard allow 'helm -n x get values rel'
+# rm flag spellings
+expect_guard ask 'rm -r -f /root/backups'
+expect_guard ask 'rm -f -r dist'
+expect_guard ask 'rm --recursive --force dist'
+expect_guard ask 'rm -R -f dist'
+expect_guard allow 'rm -f a.log b.log'
+# databases and images
+expect_guard ask 'mongosh --eval "db.dropDatabase()"'
+expect_guard ask 'mongosh --eval "db.users.drop()"'
+expect_guard ask 'mongosh --eval "db.users.deleteMany({})"'
+expect_guard ask 'mongosh --eval "db.users.updateMany({}, {})"'
+expect_guard ask 'psql -c "DROP TABLE users"'
+expect_guard ask 'psql -c "truncate table users"'
+expect_guard ask 'k3s crictl rmi --prune'
+expect_guard ask 'crictl rmi abc'
+expect_guard ask 'docker system prune -af'
+expect_guard ask 'terraform destroy'
+expect_guard allow 'mongosh --eval "db.users.find().limit(1)"'
+expect_guard allow 'k3s crictl images'
 expect_guard deny 'git commit --no-verify -m x'
 expect_guard deny $'git commit -m "x\n\nCo-Authored-By: A <a@b>"'
 
@@ -54,7 +86,7 @@ say() { jq -nc --arg t "$1" '{type:"assistant",message:{content:[{type:"text",te
 gate() {
   printf '%s\n' "$@" >"$work/t.jsonl"
   jq -n --arg p "$work/t.jsonl" '{transcript_path:$p,stop_hook_active:false}' |
-    python3 -I "$hooks/proof-gate.py" | jq -rs '.[0].decision // "allow"'
+    "$PY" -I "$hooks/proof-gate.py" | jq -rs '.[0].decision // "allow"'
 }
 expect_gate() {
   local want=$1 got
@@ -71,7 +103,7 @@ expect_gate allow "$user_prompt" "$edit" "$result" "$bash_call" "$result" "$(say
 expect_gate allow "$user_prompt" "$edit" "$result" "$(say 'Changed X. Not verified: no test runner here.')"
 expect_gate allow "$edit" "$result" "$user_prompt" "$(say 'Next answer.')"
 printf '%s\n' "$user_prompt" "$edit" >"$work/t.jsonl"
-[[ -z "$(jq -n --arg p "$work/t.jsonl" '{transcript_path:$p,stop_hook_active:true}' | python3 -I "$hooks/proof-gate.py")" ]]
+[[ -z "$(jq -n --arg p "$work/t.jsonl" '{transcript_path:$p,stop_hook_active:true}' | "$PY" -I "$hooks/proof-gate.py")" ]]
 
 cx_user='{"type":"event_msg","payload":{"type":"user_message","message":"fix it"}}'
 cx_patch='{"type":"event_msg","payload":{"type":"patch_apply_end","success":true}}'
@@ -85,19 +117,19 @@ expect_gate allow "$cx_user" "$cx_patch" "$(cx_say 'Not verified: no runner.')"
 
 printf '%s\n' "$user_prompt" "$edit" "$result" "$bash_call" >"$work/t.jsonl"
 got=$(jq -n --arg p "$work/t.jsonl" '{transcript_path:$p,stop_hook_active:false,last_assistant_message:"Checks: `make test` -> ok"}' |
-  python3 -I "$hooks/proof-gate.py" | jq -rs '.[0].decision // "allow"')
+  "$PY" -I "$hooks/proof-gate.py" | jq -rs '.[0].decision // "allow"')
 [[ "$got" == allow ]] || { echo "gate: last_assistant_message not used" >&2; exit 1; }
 
-bash "$hooks/prompt-reminder.sh" | jq -e '.hookSpecificOutput.hookEventName == "UserPromptSubmit" and (.hookSpecificOutput.additionalContext | length > 0)' >/dev/null
+"$PY" -I "$hooks/prompt-reminder.py" | jq -e '.hookSpecificOutput.hookEventName == "UserPromptSubmit" and (.hookSpecificOutput.additionalContext | length > 0)' >/dev/null
 agy_guard() {
   jq -n --arg c "$1" '{toolCall:{name:"run_command",args:{CommandLine:$c}},transcriptPath:"/x"}' |
-    python3 -I "$hooks/guard-bash.py" | jq -rs '.[0].decision // "none"'
+    "$PY" -I "$hooks/guard-bash.py" | jq -rs '.[0].decision // "none"'
 }
 [[ "$(agy_guard 'git push origin main')" == force_ask ]] || { echo 'agy guard: push not asked' >&2; exit 1; }
 [[ "$(agy_guard 'git commit --no-verify -m x')" == deny ]] || { echo 'agy guard: no-verify not denied' >&2; exit 1; }
 [[ "$(agy_guard 'git status')" == none ]] || { echo 'agy guard: status not passed through' >&2; exit 1; }
 
-bash "$hooks/prompt-reminder.sh" --antigravity | jq -e '.injectSteps[0].ephemeralMessage | length > 0' >/dev/null
+"$PY" -I "$hooks/prompt-reminder.py" --antigravity | jq -e '.injectSteps[0].ephemeralMessage | length > 0' >/dev/null
 
 ag_user='{"step_index":"0","type":"USER_INPUT","source":"USER_EXPLICIT","content":"fix it"}'
 ag_edit='{"step_index":"1","type":"PLANNER_RESPONSE","tool_calls":[{"name":"edit_file","args":{}}]}'
@@ -107,7 +139,7 @@ ag_say() { jq -nc --arg t "$1" '{step_index:"9",type:"PLANNER_RESPONSE",content:
 ag_gate() {
   printf '%s\n' "$@" >"$work/a.jsonl"
   jq -n --arg p "$work/a.jsonl" '{transcriptPath:$p,executionNum:1,terminationReason:"NO_TOOL_CALL"}' |
-    python3 -I "$hooks/proof-gate.py" | jq -rs '.[0].decision // "stop"'
+    "$PY" -I "$hooks/proof-gate.py" | jq -rs '.[0].decision // "stop"'
 }
 expect_ag() {
   local want=$1 got
@@ -121,11 +153,11 @@ expect_ag continue "$ag_user" "$ag_run" "$ag_out" "$ag_edit" "$ag_out" "$(ag_say
 expect_ag stop "$ag_user" "$ag_edit" "$ag_out" "$ag_run" "$ag_out" "$(ag_say 'Checks: `go test ./...` -> ok')"
 expect_ag stop "$ag_user" "$ag_edit" "$ag_out" "$(ag_say 'Not verified: no runner.')"
 printf '%s\n' "$ag_user" "$ag_edit" >"$work/a.jsonl"
-[[ -z "$(jq -n --arg p "$work/a.jsonl" '{transcriptPath:$p,executionNum:2,terminationReason:"NO_TOOL_CALL"}' | python3 -I "$hooks/proof-gate.py")" ]]
-[[ -z "$(jq -n --arg p "$work/a.jsonl" '{transcriptPath:$p,executionNum:1,terminationReason:"USER_CANCELED"}' | python3 -I "$hooks/proof-gate.py")" ]]
-out=$(jq -n '{transcript_path:"/nonexistent/t.jsonl",stop_hook_active:false}' | python3 -I "$hooks/proof-gate.py" 2>&1) ||
+[[ -z "$(jq -n --arg p "$work/a.jsonl" '{transcriptPath:$p,executionNum:2,terminationReason:"NO_TOOL_CALL"}' | "$PY" -I "$hooks/proof-gate.py")" ]]
+[[ -z "$(jq -n --arg p "$work/a.jsonl" '{transcriptPath:$p,executionNum:1,terminationReason:"USER_CANCELED"}' | "$PY" -I "$hooks/proof-gate.py")" ]]
+out=$(jq -n '{transcript_path:"/nonexistent/t.jsonl",stop_hook_active:false}' | "$PY" -I "$hooks/proof-gate.py" 2>&1) ||
   { echo "gate: crashed on missing transcript: $out" >&2; exit 1; }
 [[ -z "$out" ]]
 printf '%s\n' "$user_prompt" 'not json {' "$edit" "$result" "$(say 'Done.')" >"$work/t.jsonl"
-[[ "$(jq -n --arg p "$work/t.jsonl" '{transcript_path:$p,stop_hook_active:false}' | python3 -I "$hooks/proof-gate.py" | jq -r .decision)" == block ]]
+[[ "$(jq -n --arg p "$work/t.jsonl" '{transcript_path:$p,stop_hook_active:false}' | "$PY" -I "$hooks/proof-gate.py" | jq -r .decision)" == block ]]
 echo 'hooks: PASS'

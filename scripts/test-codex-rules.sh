@@ -30,5 +30,15 @@ expect prompt kubectl apply -f x.yaml
 expect prompt helm upgrade api ./chart
 expect prompt docker push img
 expect prompt gh pr create --fill
+expect prompt rm --recursive --force dist
+expect prompt rm -r -f dist
+expect prompt kubectl drain node1
+expect prompt helm delete api
+expect prompt k3s crictl rmi --prune
+expect prompt crictl rmi abc
+expect prompt docker system prune -af
+expect prompt terraform destroy
+expect allow k3s crictl images
+expect allow docker ps
 expect forbidden git commit --no-verify -m x
 echo 'codex rules: PASS'
