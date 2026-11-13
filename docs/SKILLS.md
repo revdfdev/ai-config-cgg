@@ -41,5 +41,5 @@ done
 
 ## Check
 - `ls ~/.claude/skills | wc -l` gives 27 on the work PC (16 repo + 8 skills CLI + impeccable + mobile-responsive-analyzer + `synced`).
-- `ls ~/.gemini/config/skills | wc -l` gives 25 (16 repo + 8 skills CLI + impeccable).
+- `ls ~/.gemini/config/skills | wc -l` gives 27 (16 repo + 8 skills CLI + impeccable + frontend-design + taste-skill).
 - Not verified on a clean machine: the `npx skills add` and `npx impeccable` commands.

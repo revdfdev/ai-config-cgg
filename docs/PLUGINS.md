@@ -25,6 +25,12 @@ Not used: `egm` (google/elephant-goldfish-model), removed from Claude 2026-11-13
 
 ## Antigravity
 - Plugins: none.
+- Skills copied from the Claude plugins (run after the Claude plugins are installed):
+  ```bash
+  cp -r ~/.claude/plugins/cache/taste-skill/taste-skill/*/skills/taste-skill ~/.gemini/config/skills/
+  cp -r ~/.claude/plugins/cache/claude-code-plugins/frontend-design/*/skills/frontend-design ~/.gemini/config/skills/
+  ```
+- On a machine that still has egm: `claude plugin uninstall egm@egm; claude plugin marketplace remove egm; rm -rf ~/.gemini/config/skills/egm-* ~/.gemini/config/plugins/egm`
 - MCP servers: none.
 
 ## Order on a new machine
