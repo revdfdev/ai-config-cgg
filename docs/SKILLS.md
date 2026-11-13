@@ -1,29 +1,45 @@
-# Skills for Claude Code and Antigravity
+# Skills to install at home (Claude Code + Antigravity)
 
-Follow this on a new machine. Inventory from the work PC, 2026-11-14. Codex is no longer used.
+Every skill installed on the work PC on 2026-11-14, with how to install it. Codex is no longer used.
+Claude loads `~/.claude/skills`. Antigravity loads `~/.gemini/config/skills`, `~/.gemini/skills`, `~/.gemini/antigravity/skills`.
 
-Where agents load skills:
-- Claude: `~/.claude/skills`
-- Antigravity: `~/.gemini/config/skills` (also `~/.gemini/skills`, `~/.gemini/antigravity/skills`)
+## 1. From this repo (16): `python3 ~/ai-config-ccg/install.py --yes`
+Links each into `~/.claude/skills` and `~/.gemini/config/skills`.
 
+bug-triage, diagnosing-bugs, e2e, e2e-analysis, grill-me, grilling, handoff, memory, pattern, plan, review, simplify, tdd, teach, to-questionnaire, writing-for-agents
 
-| Skill | Source | Claude | Antigravity |
-|---|---|---|---|
-| bug-triage, diagnosing-bugs, e2e, e2e-analysis, grill-me, grilling, handoff, memory, pattern, plan, review, simplify, tdd, teach, to-questionnaire, writing-for-agents | this repo `skills/` (`install.py` links them) | yes | yes |
-| design-taste-frontend | skills CLI: Leonxlnx/taste-skill | yes | yes |
-| premium-3d-website, shader-programming-glsl, threejs-lighting, threejs-materials, threejs-postprocessing, threejs-shaders, threejs-skills | skills CLI: sickn33/antigravity-awesome-skills | yes | yes (linked from `~/.claude/skills`) |
-| impeccable | impeccable npm CLI (`npx impeccable update` refreshes) | yes | yes |
-| mobile-responsive-analyzer | copied folder (source not recorded) | yes | yes |
+## 2. From GitHub with the skills CLI (17), into `~/.agents/skills`
 
-Installed in `~/.agents/skills` but not linked into Claude or Antigravity: find-skills (vercel-labs/skills), leanrea (aicodeking/leanrea), openui (thesysdev/skills), ponytail + ponytail-audit/-debt/-gain/-help/-review (DietrichGebert/ponytail), reverse-engineer-anything (source not recorded). Skills CLI install: `npx skills add <source>` (lock file `~/.agents/.skill-lock.json`).
+| Skill | Install | On work PC loaded by |
+|---|---|---|
+| design-taste-frontend | `npx skills add Leonxlnx/taste-skill` | Claude, Antigravity |
+| premium-3d-website, shader-programming-glsl, threejs-lighting, threejs-materials, threejs-postprocessing, threejs-shaders, threejs-skills | `npx skills add sickn33/antigravity-awesome-skills` (pick these 7) | Claude, Antigravity |
+| find-skills | `npx skills add vercel-labs/skills` | none (only in `~/.agents/skills`) |
+| leanrea | `npx skills add aicodeking/leanrea` | none |
+| openui | `npx skills add thesysdev/skills` | none |
+| ponytail, ponytail-audit, ponytail-debt, ponytail-gain, ponytail-help, ponytail-review | `npx skills add DietrichGebert/ponytail` | none |
 
-Note: 7 repo skills are not committed yet (diagnosing-bugs, grill-me, grilling, handoff, teach, to-questionnaire, writing-for-agents); commit them or a new machine will not get them.
+Then link the loaded ones into both agents:
+```bash
+for s in design-taste-frontend premium-3d-website shader-programming-glsl threejs-lighting threejs-materials threejs-postprocessing threejs-shaders threejs-skills; do
+  ln -sfn ~/.agents/skills/$s ~/.claude/skills/$s
+  ln -sfn ~/.agents/skills/$s ~/.gemini/config/skills/$s
+done
+```
 
-## Steps
-1. `python3 ~/ai-config-ccg/install.py --yes` links the repo skills into both agents.
-2. Skills CLI: `npx skills add Leonxlnx/taste-skill` and `npx skills add sickn33/antigravity-awesome-skills` (lands in `~/.agents/skills`).
-3. Link into Claude: `ln -s ~/.agents/skills/<name> ~/.claude/skills/<name>` for design-taste-frontend, premium-3d-website, shader-programming-glsl, threejs-*.
-4. Link into Antigravity: `ln -s ~/.claude/skills/<name> ~/.gemini/config/skills/<name>` for the same names, and `ln -s ~/.gemini/skills/impeccable ~/.gemini/config/skills/impeccable`.
-5. impeccable: install with the impeccable npm CLI into `~/.claude/skills` and `~/.gemini/skills`.
-6. mobile-responsive-analyzer: copy the folder into `~/.claude/skills` and `~/.gemini/skills`.
-7. Check: `ls ~/.claude/skills | wc -l` (27 on the work PC, incl. `synced`) and `ls ~/.gemini/config/skills | wc -l` (25).
+## 3. Other installers
+
+| Skill | Install | Loaded by |
+|---|---|---|
+| impeccable | impeccable npm CLI (`npx impeccable`; `npx impeccable update` refreshes). Copies into `~/.claude/skills` and `~/.gemini/skills`; link `~/.gemini/config/skills/impeccable` to `~/.gemini/skills/impeccable` | Claude, Antigravity |
+| reverse-engineer-anything | REA, github.com/morluto/rea (`npx -y rea-agents`), into `~/.agents/skills` | none |
+| mobile-responsive-analyzer | source not recorded: copy `~/.claude/skills/mobile-responsive-analyzer` from the work PC into `~/.claude/skills`, `~/.gemini/skills`, `~/.gemini/antigravity/skills` | Claude, Antigravity |
+
+## 4. Come with the account (no install)
+- Claude (claude.ai synced, `~/.claude/skills/synced`): built-in-browser, chrome-browser, computer-use, deep-research, docs, docx, google-workspace, import-memory, morning, pdf, pptx, skill-creator, xlsx.
+- Antigravity built-ins: agy-customizations, antigravity_guide, automation, generative_ui, mcp-app-development, migrate-agent-settings, migrate-workflows, native_swarm, permissioned-github, plugin, run-workflow, swarm_monitor, swarm_narrator, ui-plugin-navigation.
+
+## Check
+- `ls ~/.claude/skills | wc -l` gives 27 on the work PC (16 repo + 8 skills CLI + impeccable + mobile-responsive-analyzer + `synced`).
+- `ls ~/.gemini/config/skills | wc -l` gives 25 (16 repo + 8 skills CLI + impeccable).
+- Not verified on a clean machine: the `npx skills add` and `npx impeccable` commands.
