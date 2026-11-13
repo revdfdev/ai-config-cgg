@@ -165,6 +165,10 @@ def pick_agents(found):
         print("  Use numbers from the list.")
 
 
+def links_into_repo(path):
+    return path.is_symlink() and Path(os.path.realpath(path)).is_relative_to(ROOT.resolve())
+
+
 def has_own_text(path):
     return path.exists() and path.read_text(encoding="utf-8").strip() and START not in path.read_text(encoding="utf-8")
 
@@ -249,9 +253,13 @@ def build_plan(selection, skills, clash_choice):
     for key, components in selection.items():
         a = AGENTS[key]
         components = set(components) & set(parts_of(a))
-        if "rules" in components:
+        rules_path = h / a["rules"]["path"] if "rules" in components else None
+        if rules_path is not None and rules_path.exists() and rules_path.resolve() == (ROOT / "AGENTS.md").resolve():
+            # The target links to this repo's AGENTS.md: writing would copy the rules into themselves.
+            plan.notes.append("rules for %s: %s already links to %s" % (a["label"], tilde(rules_path), tilde(ROOT / "AGENTS.md")))
+        elif rules_path is not None:
             r = a["rules"]
-            p = h / r["path"]
+            p = rules_path
             old = p.read_text(encoding="utf-8") if p.exists() else ""
             if r["mode"] == "file":
                 new = agents_md + "\n"
@@ -270,8 +278,11 @@ def build_plan(selection, skills, clash_choice):
         if components & {"safety", "checks"} and "hooks" in a:
             hk = a["hooks"]
             p = h / hk["path"]
+            linked_to_repo = links_into_repo(p)
             try:
-                cur = read_json(p) or {}
+                # A link into this repo points at a template: start fresh so the rendered hooks
+                # replace the link instead of being merged into the template itself.
+                cur = {} if linked_to_repo else (read_json(p) or {})
             except ValueError:
                 plan.notes.append("skipped %s: not valid JSON, left untouched" % tilde(p))
                 cur = None
@@ -397,6 +408,8 @@ def apply_plan(plan, selection, skills):
                 backup = str(p.with_name("%s.bak-%s" % (p.name, ts)))
                 shutil.copy2(p, backup)
             rec = files[str(p)] = {"backup": backup}
+        if links_into_repo(p):
+            p.unlink()  # never write through a link into this repo's own files
         p.write_bytes(data)
         rec["written"] = sha(data)
         if plan.deny_added.get(str(p)):

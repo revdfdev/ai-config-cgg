@@ -102,6 +102,10 @@ expect_gate block "$user_prompt" "$edit" "$result" "$bash_call" "$result" "$(say
 expect_gate allow "$user_prompt" "$edit" "$result" "$bash_call" "$result" "$(say 'Checks: `go test ./...` -> ok')"
 expect_gate allow "$user_prompt" "$edit" "$result" "$(say 'Changed X. Not verified: no test runner here.')"
 expect_gate allow "$edit" "$result" "$user_prompt" "$(say 'Next answer.')"
+doc_edit='{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Write","input":{"file_path":"/repo/docs/plans/x.md"}}]}}'
+code_edit='{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/src/a.go"}}]}}'
+expect_gate allow "$user_prompt" "$doc_edit" "$result" "$(say 'Plan written.')"
+expect_gate block "$user_prompt" "$code_edit" "$result" "$doc_edit" "$result" "$(say 'Done.')"
 printf '%s\n' "$user_prompt" "$edit" >"$work/t.jsonl"
 [[ -z "$(jq -n --arg p "$work/t.jsonl" '{transcript_path:$p,stop_hook_active:true}' | "$PY" -I "$hooks/proof-gate.py")" ]]
 

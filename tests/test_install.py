@@ -59,6 +59,25 @@ class DryRun(Base):
         self.assertIn("settings.json", out)
         self.assertIn("nothing changed", out.lower())
 
+    def test_rules_not_copied_into_linked_agents_md(self):
+        # ~/.claude/CLAUDE.md linking to the repo's AGENTS.md must not get a second rules block.
+        os.symlink(str(INSTALL.parent / "AGENTS.md"), str(self.home / ".claude/CLAUDE.md"))
+        out = self.run_install("--yes", "--dry-run").stdout
+        self.assertIn("already links to", out)
+        self.assertNotIn("shared rules in ~/.claude/CLAUDE.md", out)
+
+    def test_hooks_link_into_repo_is_replaced_not_written_through(self):
+        tmpl = INSTALL.parent / "codex/hooks.json"
+        before = tmpl.read_bytes()
+        os.symlink(str(tmpl), str(self.home / ".codex/hooks.json"))
+        self.run_install("--yes")
+        self.assertEqual(tmpl.read_bytes(), before, "template in the repo was modified")
+        dst = self.home / ".codex/hooks.json"
+        self.assertFalse(dst.is_symlink())
+        text = dst.read_text(encoding="utf-8")
+        self.assertNotIn("@PYTHON@", text)
+        self.assertIn("proof-gate.py", text)
+
 
 class Merge(Base):
     def test_settings_keeps_user_keys_and_adds_ours_once(self):

@@ -6,6 +6,8 @@ import re
 import sys
 
 EDIT_TOOLS = {"Edit", "Write", "NotebookEdit"}
+# Markdown edits (plans, notes, memory) have no build or test to run.
+DOC_SUFFIXES = (".md", ".markdown")
 REPORTED = re.compile(r"(?i)\b(checks?|tests?|verified|verification|ran)\b[^\n]*[:`]")
 NOT_VERIFIED = re.compile(r"(?i)not verified")
 
@@ -32,7 +34,11 @@ def claude_turn(entries):
         for b in blocks(entry):
             if b.get("type") == "tool_use":
                 name = b.get("name")
-                steps.append("edit" if name in EDIT_TOOLS else "run" if name == "Bash" else "other")
+                path = str((b.get("input") or {}).get("file_path") or "").lower()
+                if name in EDIT_TOOLS and path.endswith(DOC_SUFFIXES):
+                    steps.append("doc")
+                else:
+                    steps.append("edit" if name in EDIT_TOOLS else "run" if name == "Bash" else "other")
                 final_text = ""
             elif b.get("type") == "text":
                 final_text += b.get("text", "")
